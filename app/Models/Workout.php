@@ -7,10 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 class Workout extends Model
 {
     protected $fillable = ['name', 'date', 'user_id'];
-    
+
     public function blocks()
     {
-        return $this->hasMany(Block::class);
+        return $this->hasMany(Block::class)->orderBy('order');
     }
 
     public function user()

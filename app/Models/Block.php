@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Block extends Model
 {
     protected $fillable = ['workout_id', 'name', 'order'];
-    
+
     public function workout()
     {
         return $this->belongsTo(Workout::class);
@@ -15,6 +15,6 @@ class Block extends Model
 
     public function blockExercises()
     {
-        return $this->hasMany(BlockExercise::class);
+        return $this->hasMany(BlockExercise::class)->orderBy('order');
     }
 }

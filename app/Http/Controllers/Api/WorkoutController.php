@@ -7,6 +7,7 @@ use App\Models\Workout;
 use App\Models\Block;
 use App\Models\BlockExercise;
 use Illuminate\Http\Request;
+//use Illuminate\Support\Facades\DB; // Sugerencia de transición para el update de workout 
 
 class WorkoutController extends Controller
 {
@@ -47,7 +48,7 @@ class WorkoutController extends Controller
                             'type' => $exerciseData['type'],
                             'reps' => $exerciseData['reps'] ?? null,
                             'time' => $exerciseData['time'] ?? null,
-                            'rest' => $exerciseData['rest'] ?? null,
+                            'intensity' => $exerciseData['intensity'] ?? null,
                             'order' => $exerciseData['order']
                         ]);
                     }
@@ -67,18 +68,90 @@ class WorkoutController extends Controller
         return $workout;
     }
 
+    // DB::transaction(function () use ($request, $workout) {// TODA lógica aquí}); // por si queremos hacer transición al actualizar
     public function update(Request $request, $id)
     {
         $workout = Workout::findOrFail($id);
 
         $validated = $request->validate([
             'name' => 'required|string',
-            'date' => 'required|date'
+            'date' => 'required|date',
+            'blocks' => 'array'
         ]);
 
-        $workout->update($validated);
+        $workout->update([
+            'name' => $validated['name'],
+            'date' => $validated['date']
+        ]);
+        $existingBlockIds = $workout->blocks()->pluck('id')->toArray();
 
-        return $workout;
+        $incomingBlockIds = collect($request->blocks ?? [])
+            ->pluck('id')
+            ->filter()
+            ->toArray();
+
+        $blocksToDelete = array_diff($existingBlockIds, $incomingBlockIds);
+
+        Block::destroy($blocksToDelete);
+
+        foreach ($request->blocks as $blockData) {
+
+            if (isset($blockData['id'])) {
+                // UPDATE
+                $block = $workout->blocks()->findOrFail($blockData['id']);
+                $block->update([
+                    'name' => $blockData['name'],
+                    'order' => $blockData['order']
+                ]);
+            } else {
+                // CREATE
+                $block = Block::create([
+                    'workout_id' => $workout->id,
+                    'name' => $blockData['name'],
+                    'order' => $blockData['order']
+                ]);
+            }
+            $existingExerciseIds = $block->blockExercises()->pluck('id')->toArray();
+
+            $incomingExerciseIds = collect($blockData['exercises'] ?? [])
+                ->pluck('id')
+                ->filter()
+                ->toArray();
+
+            $exercisesToDelete = array_diff($existingExerciseIds, $incomingExerciseIds);
+
+            BlockExercise::destroy($exercisesToDelete);
+            foreach ($blockData['exercises'] ?? [] as $exerciseData) {
+
+                if (isset($exerciseData['id'])) {
+                    // UPDATE
+                    $be = $block->blockExercises()->findOrFail($exerciseData['id']);
+
+                    $be->update([
+                        'exercise_id' => $exerciseData['exercise_id'],
+                        'type' => $exerciseData['type'],
+                        'reps' => $exerciseData['reps'] ?? null,
+                        'time' => $exerciseData['time'] ?? null,
+                        'intensity' => $exerciseData['intensity'] ?? null,
+                        'order' => $exerciseData['order']
+                    ]);
+                } else {
+                    // CREATE
+                    BlockExercise::create([
+                        'block_id' => $block->id,
+                        'exercise_id' => $exerciseData['exercise_id'],
+                        'type' => $exerciseData['type'],
+                        'reps' => $exerciseData['reps'] ?? null,
+                        'time' => $exerciseData['time'] ?? null,
+                        'intensity' => $exerciseData['intensity'] ?? null,
+                        'order' => $exerciseData['order']
+                    ]);
+                }
+            }
+        }
+        return response()->json(
+            $workout->load('blocks.blockExercises.exercise')
+        );
     }
 
     public function display($id)
@@ -90,14 +163,14 @@ class WorkoutController extends Controller
             'blocks' => []
         ];
 
-        foreach ($workout->blocks->sortBy('order') as $block) {
+        foreach ($workout->blocks as $block) {
 
             $blockData = [
                 'name' => $block->name,
                 'exercises' => []
             ];
 
-            foreach ($block->blockExercises->sortBy('order') as $be) {
+            foreach ($block->blockExercises as $be) {
 
                 $value = $be->type === 'reps' ? $be->reps : $be->time;
 
@@ -106,7 +179,7 @@ class WorkoutController extends Controller
                     'video_url' => $be->exercise->video_url,
                     'type' => $be->type,
                     'value' => $value,
-                    'rest' => $be->rest
+                    'intensity' => $be->intensity
                 ];
             }
 

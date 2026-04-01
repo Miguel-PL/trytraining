@@ -12,7 +12,7 @@ class BlockExercise extends Model
         'type',
         'reps',
         'time',
-        'rest',
+        'intensity',
         'order'
     ];
 

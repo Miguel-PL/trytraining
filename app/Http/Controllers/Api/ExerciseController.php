@@ -8,13 +8,7 @@ use App\Models\Exercise;
 
 class ExerciseController extends Controller
 {
-    public function index()
-    {
-        return Exercise::with('categories')->get();
-    }
-
-    // Juntar search con index (si entran parametros o no)
-    public function search(Request $request)
+    public function index(Request $request)
     {
         $query = Exercise::query();
 
@@ -32,7 +26,13 @@ class ExerciseController extends Controller
 
         return $query->with('categories')->get();
     }
-    // public function show($id) (ejercicios)
+
+    public function show($id)
+    {
+        $exercise = Exercise::with('categories')->findOrFail($id);
+
+        return response()->json($exercise);
+    }
 
     public function store(Request $request)
     {
@@ -51,7 +51,6 @@ class ExerciseController extends Controller
         return response()->json($exercise->load('categories'), 201);
     }
 
-    
 
     public function update(Request $request, $id)
     {
@@ -59,12 +58,23 @@ class ExerciseController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'video_url' => 'required|url'
+            'video_url' => 'required|url',
+            'categories' => 'array'
         ]);
 
-        $exercise->update($validated);
+        $exercise->update([
+            'name' => $validated['name'],
+            'video_url' => $validated['video_url']
+        ]);
 
-        return response()->json($exercise);
+        // 🔥 sincronizar categorías
+        if ($request->has('categories')) {
+            $exercise->categories()->sync($request->categories);
+        }
+
+        return response()->json(
+            $exercise->load('categories')
+        );
     }
 
     public function destroy($id)

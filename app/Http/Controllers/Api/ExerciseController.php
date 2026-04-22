@@ -12,6 +12,10 @@ class ExerciseController extends Controller
     {
         $query = Exercise::query();
 
+        if ($request->has('all')) {
+            return Exercise::with('categories')->get();
+        }
+
         // Buscar por nombre
         if ($request->has('name')) {
             $query->where('name', 'like', '%' . $request->name . '%');
@@ -24,7 +28,7 @@ class ExerciseController extends Controller
             });
         }
 
-        return $query->with('categories')->get();
+        return $query->with('categories')->paginate(10);
     }
 
     public function show($id)
@@ -38,7 +42,7 @@ class ExerciseController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'video_url' => 'required|url',
+            'video_url' => 'required|string|max:255',
             'categories' => 'array'
         ]);
 
@@ -58,7 +62,7 @@ class ExerciseController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'video_url' => 'required|url',
+            'video_url' => 'required|string|max:255',
             'categories' => 'array'
         ]);
 

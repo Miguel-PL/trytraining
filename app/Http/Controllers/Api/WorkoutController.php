@@ -13,7 +13,18 @@ class WorkoutController extends Controller
 {
     public function index(Request $request)
     {
-        return Workout::where('user_id', $request->user()->id)->get();
+        $query = Workout::where('user_id', $request->user()->id)
+            ->orderBy('date', 'desc');
+
+        // ordenar por fecha (reciente primero)
+        $query->orderBy('date', 'desc');
+
+        // filtro por nombre
+        if ($request->has('name')) {
+            $query->where('name', 'like', '%' . $request->name . '%');
+        }
+
+        return $query->paginate(5);
     }
 
     public function store(Request $request)

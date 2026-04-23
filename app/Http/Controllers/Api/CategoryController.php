@@ -5,12 +5,24 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Category;
+use Illuminate\Support\Facades\DB;
 
 class CategoryController extends Controller
 {
     public function index()
     {
-        return Category::all();
+        $driver = DB::getDriverName();
+        $query = Category::query();
+
+        if ($driver === 'mysql') {
+            $query->orderByRaw('name COLLATE utf8mb4_spanish_ci asc');
+        } elseif ($driver === 'pgsql') {
+            $query->orderByRaw('name COLLATE "es_ES" asc');
+        } else {
+            $query->orderBy('name');
+        }
+
+        return $query->get();
     }
 
     public function show($id)

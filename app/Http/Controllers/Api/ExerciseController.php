@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Exercise;
+use Illuminate\Support\Facades\DB;
 
 class ExerciseController extends Controller
 {
@@ -13,7 +14,18 @@ class ExerciseController extends Controller
         $query = Exercise::query();
 
         if ($request->has('all')) {
-            return Exercise::with('categories')->get();
+            $driver = DB::getDriverName();
+            $allQuery = Exercise::with('categories');
+
+            if ($driver === 'mysql') {
+                $allQuery->orderByRaw('name COLLATE utf8mb4_spanish_ci asc');
+            } elseif ($driver === 'pgsql') {
+                $allQuery->orderByRaw('name COLLATE "es_ES" asc');
+            } else {
+                $allQuery->orderBy('name');
+            }
+
+            return $allQuery->get();
         }
 
         // Buscar por nombre
@@ -26,6 +38,15 @@ class ExerciseController extends Controller
             $query->whereHas('categories', function ($q) use ($request) {
                 $q->where('categories.id', $request->category_id);
             });
+        }
+
+        $driver = DB::getDriverName();
+        if ($driver === 'mysql') {
+            $query->orderByRaw('name COLLATE utf8mb4_spanish_ci asc');
+        } elseif ($driver === 'pgsql') {
+            $query->orderByRaw('name COLLATE "es_ES" asc');
+        } else {
+            $query->orderBy('name');
         }
 
         return $query->with('categories')->paginate(10);

@@ -1,0 +1,1 @@
+"Usa siempre la estructura de Laravel 11/12. No busques archivos en app/Http/Kernel.php porque ya no existen. Usa composición de API para Vue".

@@ -32,7 +32,8 @@ class WorkoutController extends Controller
         $validated = $request->validate([
             'name' => 'required|string',
             'date' => 'required|date',
-            'blocks' => 'array'
+            'blocks' => 'array',
+            'blocks.*.exercises.*.intensity' => 'required|integer|min:1|max:10',
         ]);
 
         $workout = Workout::create([
@@ -59,7 +60,7 @@ class WorkoutController extends Controller
                             'type' => $exerciseData['type'],
                             'reps' => $exerciseData['reps'] ?? null,
                             'time' => $exerciseData['time'] ?? null,
-                            'intensity' => $exerciseData['intensity'] ?? null,
+                            'intensity' => $exerciseData['intensity'],
                             'order' => $exerciseData['order']
                         ]);
                     }
@@ -87,7 +88,8 @@ class WorkoutController extends Controller
         $validated = $request->validate([
             'name' => 'required|string',
             'date' => 'required|date',
-            'blocks' => 'array'
+            'blocks' => 'array',
+            'blocks.*.exercises.*.intensity' => 'required|integer|min:1|max:10',
         ]);
 
         $workout->update([
@@ -143,7 +145,7 @@ class WorkoutController extends Controller
                         'type' => $exerciseData['type'],
                         'reps' => $exerciseData['reps'] ?? null,
                         'time' => $exerciseData['time'] ?? null,
-                        'intensity' => $exerciseData['intensity'] ?? null,
+                        'intensity' => $exerciseData['intensity'],
                         'order' => $exerciseData['order']
                     ]);
                 } else {
@@ -154,7 +156,7 @@ class WorkoutController extends Controller
                         'type' => $exerciseData['type'],
                         'reps' => $exerciseData['reps'] ?? null,
                         'time' => $exerciseData['time'] ?? null,
-                        'intensity' => $exerciseData['intensity'] ?? null,
+                        'intensity' => $exerciseData['intensity'],
                         'order' => $exerciseData['order']
                     ]);
                 }

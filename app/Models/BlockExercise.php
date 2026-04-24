@@ -16,6 +16,10 @@ class BlockExercise extends Model
         'order'
     ];
 
+    protected $casts = [
+        'intensity' => 'integer',
+    ];
+
     public function block()
     {
         return $this->belongsTo(Block::class);

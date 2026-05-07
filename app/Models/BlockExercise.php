@@ -13,11 +13,7 @@ class BlockExercise extends Model
         'reps',
         'time',
         'intensity',
-        'order'
-    ];
-
-    protected $casts = [
-        'intensity' => 'integer',
+        'order',
     ];
 
     public function block()

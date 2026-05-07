@@ -3,14 +3,33 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Workout;
 use App\Models\Block;
 use App\Models\BlockExercise;
+use App\Models\Workout;
 use Illuminate\Http\Request;
-//use Illuminate\Support\Facades\DB; // Sugerencia de transición para el update de workout 
+
+// use Illuminate\Support\Facades\DB; // Sugerencia de transición para el update de workout
 
 class WorkoutController extends Controller
 {
+    /** @return array<int, \Closure> */
+    private function nullableExerciseTextRules(): array
+    {
+        return [function (string $attribute, mixed $value, \Closure $fail): void {
+            if ($value === null) {
+                return;
+            }
+            if (! is_scalar($value)) {
+                $fail(__('validation.string'));
+
+                return;
+            }
+            if (strlen((string) $value) > 255) {
+                $fail(__('validation.max.string', ['attribute' => $attribute, 'max' => 255]));
+            }
+        }];
+    }
+
     public function index(Request $request)
     {
         $query = Workout::where('user_id', $request->user()->id)
@@ -21,7 +40,7 @@ class WorkoutController extends Controller
 
         // filtro por nombre
         if ($request->has('name')) {
-            $query->where('name', 'like', '%' . $request->name . '%');
+            $query->where('name', 'like', '%'.$request->name.'%');
         }
 
         return $query->paginate(5);
@@ -33,13 +52,15 @@ class WorkoutController extends Controller
             'name' => 'required|string',
             'date' => 'required|date',
             'blocks' => 'array',
-            'blocks.*.exercises.*.intensity' => 'required|integer|min:1|max:10',
+            'blocks.*.exercises.*.reps' => $this->nullableExerciseTextRules(),
+            'blocks.*.exercises.*.time' => $this->nullableExerciseTextRules(),
+            'blocks.*.exercises.*.intensity' => $this->nullableExerciseTextRules(),
         ]);
 
         $workout = Workout::create([
             'name' => $request->name,
             'date' => $request->date,
-            'user_id' => $request->user()->id
+            'user_id' => $request->user()->id,
         ]);
 
         if ($request->has('blocks')) {
@@ -48,7 +69,7 @@ class WorkoutController extends Controller
                 $block = Block::create([
                     'workout_id' => $workout->id,
                     'name' => $blockData['name'],
-                    'order' => $blockData['order']
+                    'order' => $blockData['order'],
                 ]);
 
                 if (isset($blockData['exercises'])) {
@@ -60,8 +81,8 @@ class WorkoutController extends Controller
                             'type' => $exerciseData['type'],
                             'reps' => $exerciseData['reps'] ?? null,
                             'time' => $exerciseData['time'] ?? null,
-                            'intensity' => $exerciseData['intensity'],
-                            'order' => $exerciseData['order']
+                            'intensity' => $exerciseData['intensity'] ?? null,
+                            'order' => $exerciseData['order'],
                         ]);
                     }
                 }
@@ -89,12 +110,14 @@ class WorkoutController extends Controller
             'name' => 'required|string',
             'date' => 'required|date',
             'blocks' => 'array',
-            'blocks.*.exercises.*.intensity' => 'required|integer|min:1|max:10',
+            'blocks.*.exercises.*.reps' => $this->nullableExerciseTextRules(),
+            'blocks.*.exercises.*.time' => $this->nullableExerciseTextRules(),
+            'blocks.*.exercises.*.intensity' => $this->nullableExerciseTextRules(),
         ]);
 
         $workout->update([
             'name' => $validated['name'],
-            'date' => $validated['date']
+            'date' => $validated['date'],
         ]);
         $existingBlockIds = $workout->blocks()->pluck('id')->toArray();
 
@@ -114,14 +137,14 @@ class WorkoutController extends Controller
                 $block = $workout->blocks()->findOrFail($blockData['id']);
                 $block->update([
                     'name' => $blockData['name'],
-                    'order' => $blockData['order']
+                    'order' => $blockData['order'],
                 ]);
             } else {
                 // CREATE
                 $block = Block::create([
                     'workout_id' => $workout->id,
                     'name' => $blockData['name'],
-                    'order' => $blockData['order']
+                    'order' => $blockData['order'],
                 ]);
             }
             $existingExerciseIds = $block->blockExercises()->pluck('id')->toArray();
@@ -145,8 +168,8 @@ class WorkoutController extends Controller
                         'type' => $exerciseData['type'],
                         'reps' => $exerciseData['reps'] ?? null,
                         'time' => $exerciseData['time'] ?? null,
-                        'intensity' => $exerciseData['intensity'],
-                        'order' => $exerciseData['order']
+                        'intensity' => $exerciseData['intensity'] ?? null,
+                        'order' => $exerciseData['order'],
                     ]);
                 } else {
                     // CREATE
@@ -156,12 +179,13 @@ class WorkoutController extends Controller
                         'type' => $exerciseData['type'],
                         'reps' => $exerciseData['reps'] ?? null,
                         'time' => $exerciseData['time'] ?? null,
-                        'intensity' => $exerciseData['intensity'],
-                        'order' => $exerciseData['order']
+                        'intensity' => $exerciseData['intensity'] ?? null,
+                        'order' => $exerciseData['order'],
                     ]);
                 }
             }
         }
+
         return response()->json(
             $workout->load('blocks.blockExercises.exercise')
         );
@@ -173,14 +197,14 @@ class WorkoutController extends Controller
 
         $result = [
             'name' => $workout->name,
-            'blocks' => []
+            'blocks' => [],
         ];
 
         foreach ($workout->blocks as $block) {
 
             $blockData = [
                 'name' => $block->name,
-                'exercises' => []
+                'exercises' => [],
             ];
 
             foreach ($block->blockExercises as $be) {
@@ -192,7 +216,7 @@ class WorkoutController extends Controller
                     'video_url' => $be->exercise->video_url,
                     'type' => $be->type,
                     'value' => $value,
-                    'intensity' => $be->intensity
+                    'intensity' => $be->intensity,
                 ];
             }
 

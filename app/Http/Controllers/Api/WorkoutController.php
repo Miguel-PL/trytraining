@@ -214,6 +214,7 @@ class WorkoutController extends Controller
                 $blockData['exercises'][] = [
                     'name' => $be->exercise->name,
                     'video_url' => $be->exercise->video_url,
+                    'video_status' => $be->exercise->video_status,
                     'type' => $be->type,
                     'value' => $value,
                     'intensity' => $be->intensity,

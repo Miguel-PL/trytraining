@@ -43,7 +43,7 @@ class WorkoutController extends Controller
             $query->where('name', 'like', '%'.$request->name.'%');
         }
 
-        return $query->paginate(5);
+        return $query->paginate(10);
     }
 
     public function store(Request $request)

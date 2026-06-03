@@ -115,7 +115,7 @@ class ExerciseController extends Controller
         }
 
         return ExerciseResource::collection(
-            $query->with('categories')->paginate(10)
+            $query->with('categories')->paginate(100)
         );
     }
 

@@ -23,7 +23,7 @@ Backend desarrollado con Laravel y PHP para una aplicación de gestión de entre
 ## Instalación
 
 ```bash
-git clone <url-del-repositorio>
+git clone https://github.com/Miguel-PL/trytraining.git
 cd gym-workouts-backend
 composer install
 cp .env.example .env

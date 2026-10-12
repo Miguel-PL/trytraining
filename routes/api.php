@@ -1,14 +1,15 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\ExerciseController;
-use App\Http\Controllers\Api\CategoryController;
-use App\Http\Controllers\Api\WorkoutController;
 use App\Http\Controllers\Api\AuthController;
-
-
+use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\ExerciseController;
+use App\Http\Controllers\Api\WorkoutController;
+use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
+
+// Público a propósito: alimenta la pantalla del gimnasio mostrando una rutina.
+// Solo expone el contenido del entrenamiento (sin datos del usuario propietario).
 Route::get('/workouts/{id}/display', [WorkoutController::class, 'display']);
 
 Route::middleware('auth:sanctum')->group(function () {

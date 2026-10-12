@@ -7,8 +7,7 @@ use App\Models\Block;
 use App\Models\BlockExercise;
 use App\Models\Workout;
 use Illuminate\Http\Request;
-
-// use Illuminate\Support\Facades\DB; // Sugerencia de transición para el update de workout
+use Illuminate\Support\Facades\DB;
 
 class WorkoutController extends Controller
 {
@@ -30,16 +29,38 @@ class WorkoutController extends Controller
         }];
     }
 
+    /**
+     * Reglas compartidas por store() y update().
+     *
+     * @return array<string, mixed>
+     */
+    private function workoutRules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'date' => ['required', 'date'],
+            'blocks' => ['sometimes', 'array'],
+            'blocks.*.id' => ['sometimes', 'nullable', 'integer'],
+            'blocks.*.name' => ['required', 'string', 'max:255'],
+            'blocks.*.order' => ['required', 'integer', 'min:0'],
+            'blocks.*.exercises' => ['sometimes', 'array'],
+            'blocks.*.exercises.*.id' => ['sometimes', 'nullable', 'integer'],
+            'blocks.*.exercises.*.exercise_id' => ['required', 'integer', 'exists:exercises,id'],
+            'blocks.*.exercises.*.type' => ['required', 'string', 'in:reps,time'],
+            'blocks.*.exercises.*.reps' => $this->nullableExerciseTextRules(),
+            'blocks.*.exercises.*.time' => $this->nullableExerciseTextRules(),
+            'blocks.*.exercises.*.intensity' => $this->nullableExerciseTextRules(),
+            'blocks.*.exercises.*.order' => ['required', 'integer', 'min:0'],
+        ];
+    }
+
     public function index(Request $request)
     {
         $query = Workout::where('user_id', $request->user()->id)
             ->orderBy('date', 'desc');
 
-        // ordenar por fecha (reciente primero)
-        $query->orderBy('date', 'desc');
-
         // filtro por nombre
-        if ($request->has('name')) {
+        if ($request->filled('name')) {
             $query->where('name', 'like', '%'.$request->name.'%');
         }
 
@@ -48,46 +69,19 @@ class WorkoutController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string',
-            'date' => 'required|date',
-            'blocks' => 'array',
-            'blocks.*.exercises.*.reps' => $this->nullableExerciseTextRules(),
-            'blocks.*.exercises.*.time' => $this->nullableExerciseTextRules(),
-            'blocks.*.exercises.*.intensity' => $this->nullableExerciseTextRules(),
-        ]);
+        $validated = $request->validate($this->workoutRules());
 
-        $workout = Workout::create([
-            'name' => $request->name,
-            'date' => $request->date,
-            'user_id' => $request->user()->id,
-        ]);
+        $workout = DB::transaction(function () use ($request, $validated) {
+            $workout = Workout::create([
+                'name' => $validated['name'],
+                'date' => $validated['date'],
+                'user_id' => $request->user()->id,
+            ]);
 
-        if ($request->has('blocks')) {
-            foreach ($request->blocks as $blockData) {
+            $this->syncBlocks($workout, $validated['blocks'] ?? []);
 
-                $block = Block::create([
-                    'workout_id' => $workout->id,
-                    'name' => $blockData['name'],
-                    'order' => $blockData['order'],
-                ]);
-
-                if (isset($blockData['exercises'])) {
-                    foreach ($blockData['exercises'] as $exerciseData) {
-
-                        BlockExercise::create([
-                            'block_id' => $block->id,
-                            'exercise_id' => $exerciseData['exercise_id'],
-                            'type' => $exerciseData['type'],
-                            'reps' => $exerciseData['reps'] ?? null,
-                            'time' => $exerciseData['time'] ?? null,
-                            'intensity' => $exerciseData['intensity'] ?? null,
-                            'order' => $exerciseData['order'],
-                        ]);
-                    }
-                }
-            }
-        }
+            return $workout;
+        });
 
         return response()->json($workout->load('blocks.blockExercises.exercise'), 201);
     }
@@ -101,96 +95,107 @@ class WorkoutController extends Controller
         return $workout;
     }
 
-    // DB::transaction(function () use ($request, $workout) {// TODA lógica aquí}); // por si queremos hacer transición al actualizar
     public function update(Request $request, $id)
     {
-        $workout = Workout::findOrFail($id);
+        // Solo el propietario puede modificar el entrenamiento.
+        $workout = Workout::where('user_id', $request->user()->id)
+            ->findOrFail($id);
 
-        $validated = $request->validate([
-            'name' => 'required|string',
-            'date' => 'required|date',
-            'blocks' => 'array',
-            'blocks.*.exercises.*.reps' => $this->nullableExerciseTextRules(),
-            'blocks.*.exercises.*.time' => $this->nullableExerciseTextRules(),
-            'blocks.*.exercises.*.intensity' => $this->nullableExerciseTextRules(),
-        ]);
+        $validated = $request->validate($this->workoutRules());
 
-        $workout->update([
-            'name' => $validated['name'],
-            'date' => $validated['date'],
-        ]);
-        $existingBlockIds = $workout->blocks()->pluck('id')->toArray();
+        DB::transaction(function () use ($workout, $validated) {
+            $workout->update([
+                'name' => $validated['name'],
+                'date' => $validated['date'],
+            ]);
 
-        $incomingBlockIds = collect($request->blocks ?? [])
-            ->pluck('id')
-            ->filter()
-            ->toArray();
-
-        $blocksToDelete = array_diff($existingBlockIds, $incomingBlockIds);
-
-        Block::destroy($blocksToDelete);
-
-        foreach ($request->blocks as $blockData) {
-
-            if (isset($blockData['id'])) {
-                // UPDATE
-                $block = $workout->blocks()->findOrFail($blockData['id']);
-                $block->update([
-                    'name' => $blockData['name'],
-                    'order' => $blockData['order'],
-                ]);
-            } else {
-                // CREATE
-                $block = Block::create([
-                    'workout_id' => $workout->id,
-                    'name' => $blockData['name'],
-                    'order' => $blockData['order'],
-                ]);
-            }
-            $existingExerciseIds = $block->blockExercises()->pluck('id')->toArray();
-
-            $incomingExerciseIds = collect($blockData['exercises'] ?? [])
-                ->pluck('id')
-                ->filter()
-                ->toArray();
-
-            $exercisesToDelete = array_diff($existingExerciseIds, $incomingExerciseIds);
-
-            BlockExercise::destroy($exercisesToDelete);
-            foreach ($blockData['exercises'] ?? [] as $exerciseData) {
-
-                if (isset($exerciseData['id'])) {
-                    // UPDATE
-                    $be = $block->blockExercises()->findOrFail($exerciseData['id']);
-
-                    $be->update([
-                        'exercise_id' => $exerciseData['exercise_id'],
-                        'type' => $exerciseData['type'],
-                        'reps' => $exerciseData['reps'] ?? null,
-                        'time' => $exerciseData['time'] ?? null,
-                        'intensity' => $exerciseData['intensity'] ?? null,
-                        'order' => $exerciseData['order'],
-                    ]);
-                } else {
-                    // CREATE
-                    BlockExercise::create([
-                        'block_id' => $block->id,
-                        'exercise_id' => $exerciseData['exercise_id'],
-                        'type' => $exerciseData['type'],
-                        'reps' => $exerciseData['reps'] ?? null,
-                        'time' => $exerciseData['time'] ?? null,
-                        'intensity' => $exerciseData['intensity'] ?? null,
-                        'order' => $exerciseData['order'],
-                    ]);
-                }
-            }
-        }
+            $this->syncBlocks($workout, $validated['blocks'] ?? []);
+        });
 
         return response()->json(
             $workout->load('blocks.blockExercises.exercise')
         );
     }
 
+    /**
+     * Sincroniza (crea, actualiza y elimina) los bloques del entrenamiento.
+     *
+     * Los identificadores recibidos se resuelven siempre a través de la
+     * relación del entrenamiento (`$workout->blocks()->findOrFail()`), de modo
+     * que un id de otro entrenamiento provoca un 404 en lugar de modificar
+     * datos ajenos.
+     *
+     * @param  array<int, array<string, mixed>>  $blocks
+     */
+    private function syncBlocks(Workout $workout, array $blocks): void
+    {
+        $existingBlockIds = $workout->blocks()->pluck('id')->all();
+        $incomingBlockIds = collect($blocks)->pluck('id')->filter()->all();
+
+        Block::destroy(array_diff($existingBlockIds, $incomingBlockIds));
+
+        foreach ($blocks as $blockData) {
+            if (isset($blockData['id'])) {
+                $block = $workout->blocks()->findOrFail($blockData['id']);
+
+                $block->update([
+                    'name' => $blockData['name'],
+                    'order' => $blockData['order'],
+                ]);
+            } else {
+                $block = Block::create([
+                    'workout_id' => $workout->id,
+                    'name' => $blockData['name'],
+                    'order' => $blockData['order'],
+                ]);
+            }
+
+            $this->syncBlockExercises($block, $blockData['exercises'] ?? []);
+        }
+    }
+
+    /**
+     * Sincroniza (crea, actualiza y elimina) los ejercicios de un bloque.
+     *
+     * Igual que en syncBlocks(), los ids se resuelven a través de la relación
+     * del bloque para impedir que se modifiquen ejercicios de otro bloque.
+     *
+     * @param  array<int, array<string, mixed>>  $exercises
+     */
+    private function syncBlockExercises(Block $block, array $exercises): void
+    {
+        $existingExerciseIds = $block->blockExercises()->pluck('id')->all();
+        $incomingExerciseIds = collect($exercises)->pluck('id')->filter()->all();
+
+        BlockExercise::destroy(array_diff($existingExerciseIds, $incomingExerciseIds));
+
+        foreach ($exercises as $exerciseData) {
+            $attributes = [
+                'exercise_id' => $exerciseData['exercise_id'],
+                'type' => $exerciseData['type'],
+                'reps' => $exerciseData['reps'] ?? null,
+                'time' => $exerciseData['time'] ?? null,
+                'intensity' => $exerciseData['intensity'] ?? null,
+                'order' => $exerciseData['order'],
+            ];
+
+            if (isset($exerciseData['id'])) {
+                $blockExercise = $block->blockExercises()->findOrFail($exerciseData['id']);
+
+                $blockExercise->update($attributes);
+            } else {
+                BlockExercise::create($attributes + ['block_id' => $block->id]);
+            }
+        }
+    }
+
+    /**
+     * Endpoint público pensado para la pantalla del gimnasio.
+     *
+     * Expone únicamente el contenido de la rutina (nombre, bloques y
+     * ejercicios con su vídeo y parámetros). No incluye datos del usuario
+     * propietario, por lo que permanece fuera de `auth:sanctum`.
+     */
     public function display($id)
     {
         $workout = Workout::with('blocks.blockExercises.exercise')->findOrFail($id);
@@ -201,14 +206,12 @@ class WorkoutController extends Controller
         ];
 
         foreach ($workout->blocks as $block) {
-
             $blockData = [
                 'name' => $block->name,
                 'exercises' => [],
             ];
 
             foreach ($block->blockExercises as $be) {
-
                 $value = $be->type === 'reps' ? $be->reps : $be->time;
 
                 $blockData['exercises'][] = [

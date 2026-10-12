@@ -1,1 +1,14 @@
-"Usa siempre la estructura de Laravel 11/12. No busques archivos en app/Http/Kernel.php porque ya no existen. Usa composición de API para Vue".
+Proyecto: Try Training — API REST construida con Laravel 12.
+
+- Usa la estructura de Laravel 11/12. No busques app/Http/Kernel.php ni
+  app/Http/Middleware: ya no existen; los middlewares se registran en
+  bootstrap/app.php y los comandos en routes/console.php.
+- El backend es una API REST: declara los endpoints en routes/api.php (prefijo
+  /api) y protege los recursos con el middleware auth:sanctum.
+- Los entrenamientos (Workout) pertenecen a un usuario. Comprueba siempre la
+  propiedad a través de la relación antes de leer o modificar datos.
+- Valida las estructuras anidadas (blocks y sus exercises) y usa transacciones
+  de base de datos cuando una operación realice varias escrituras.
+- Responde siempre en JSON con códigos HTTP coherentes (200, 201, 404, 422).
+- El proyecto no tiene frontend SPA: la vista Blade raíz es solo informativa.
+  No añadas Vue ni otros frameworks de frontend sin una necesidad clara.

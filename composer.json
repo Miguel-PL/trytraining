@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "miguel-pl/trytraining",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "REST API backend for Try Training, a gym training routines manager (exercises, categories and workouts with video support).",
+    "keywords": ["laravel", "api", "gym", "training", "workouts", "sanctum"],
     "license": "MIT",
     "require": {
         "php": "^8.2",
